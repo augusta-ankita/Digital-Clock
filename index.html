@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Digital Clock with Weather, Alarms & World Time</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Orbitron&family=Roboto&display=swap');
+  body {
+    margin: 0;
+    font-family: 'Roboto', sans-serif;
+    background: linear-gradient(135deg, #2c3e50, #4ca1af);
+    color: #eee;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    align-items: center;
+    justify-content: flex-start;
+    padding: 20px;
+  }
+  h1 {
+    font-family: 'Orbitron', sans-serif;
+    font-weight: 700;
+    font-size: 3rem;
+    margin-bottom: 10px;
+    color: #00ffd2;
+    text-shadow: 0 0 10px #00ffd2;
+  }
+  .clock {
+    font-family: 'Orbitron', monospace;
+    font-size: 4rem;
+    margin: 0;
+    color: #00ffd2;
+    letter-spacing: 4px;
+    text-shadow: 0 0 15px #00ffd2;
+  }
+  .temperature {
+    font-size: 1.5rem;
+    margin-top: 5px;
+    color: #ffd600;
+    text-shadow: 0 0 8px #ffd600;
+  }
+  #status {
+    margin-top: 10px;
+    font-size: 0.9rem;
+    color: #bbb;
+  }
+  section {
+    background: rgba(0,0,0,0.2);
+    border-radius: 12px;
+    padding: 20px;
+    margin: 20px 0;
+    width: 100%;
+    max-width: 480px;
+    box-shadow: 0 0 15px rgba(0,0,0,0.4);
+  }
+  label {
+    display: block;
+    margin-bottom: 6px;
+    font-weight: 600;
+  }
+  input[type="time"] {
+    width: 100%;
+    padding: 8px;
+    font-size: 1.2rem;
+    border-radius: 6px;
+    border: none;
+    outline: none;
+    box-sizing: border-box;
+  }
+  button {
+    margin-top: 10px;
+    padding: 10px 18px;
+    font-size: 1rem;
+    font-weight: 700;
+    border: none;
+    border-radius: 8px;
+    background: #00ffd2;
+    color: #000;
+    cursor: pointer;
+    transition: background 0.3s ease;
+  }
+  button:hover {
+    background: #00b8ab;
+    color: #fff;
+  }
+  ul.alarm-list {
+    list-style: none;
+    padding-left: 0;
+  }
+  ul.alarm-list li {
+    margin: 6px 0;
+    background: rgba(0,255,210,0.2);
+    padding: 8px 12px;
+    border-radius: 6px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-weight: 600;
+  }
+  ul.alarm-list li button {
+    background: #ff4c4c;
+    color: #fff;
+    border-radius: 50%;
+    padding: 4px 8px;
+    font-weight: 700;
+    cursor: pointer;
+    border: none;
+  }
+  ul.alarm-list li button:hover {
+    background: #cc0000;
+  }
+  select {
+    padding: 8px 10px;
+    font-size: 1.1rem;
+    border-radius: 8px;
+    border: none;
+    outline: none;
+    width: 100%;
+    box-sizing: border-box;
+  }
+  .world-time-display {
+    margin-top: 15px;
+    font-family: 'Orbitron', monospace;
+    font-size: 1.8rem;
+    text-align: center;
+    color: #00ffff;
+    text-shadow: 0 0 10px #00ffff;
+  }
+  footer {
+    margin-top: auto;
+    font-size: 0.8rem;
+    color: #777;
+  }
+  .toggle-container {
+    margin-top: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    user-select: none;
+    color: #00ffd2;
+  }
+  input[type="checkbox"] {
+    width: 20px;
+    height: 20px;
+    cursor: pointer;
+  }
+  @media (max-width: 520px) {
+    h1 {
+      font-size: 2.2rem;
+    }
+    .clock {
+      font-size: 2.8rem;
+      letter-spacing: 2px;
+    }
+    section {
+      width: 90%;
+      padding: 15px;
+    }
+  }
+</style>
+</head>
+<body>
+  <h1>Digital Clock & Weather</h1>
+  <p id="status">Loading local time and weather...</p>
+  <p class="clock" id="local-clock">--:--:--</p>
+  <div class="toggle-container">
+    <label for="toggle-12-24">12-Hour Clock</label>
+    <input type="checkbox" id="toggle-12-24" title="Toggle 12/24 hour clock" />
+  </div>
+  <p class="temperature" id="local-temp"></p>
+
+  <section id="alarm-section">
+    <h2>Set Alarm</h2>
+    <label for="alarm-time">Choose time:</label>
+    <input type="time" id="alarm-time" />
+    <button id="add-alarm-btn">Add Alarm</button>
+    <ul id="alarms-list" class="alarm-list"></ul>
+  </section>
+
+  <section id="world-time-section">
+    <h2>World Time</h2>
+    <label for="world-timezone">Select a country/continent timezone:</label>
+    <select id="world-timezone"></select>
+    <div class="world-time-display" id="world-time-display">--:--:--</div>
+  </section>
+
+  <audio id="alarm-sound" src="https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg" preload="auto"></audio>
+
+<script>
+  // Utility function to pad numbers with leading zero
+  function pad(num) {
+    return num < 10 ? '0' + num : num;
+  }
+
+  // Get references to elements
+  const localClockEl = document.getElementById('local-clock');
+  const localTempEl = document.getElementById('local-temp');
+  const statusEl = document.getElementById('status');
+  const alarmTimeInput = document.getElementById('alarm-time');
+  const addAlarmBtn = document.getElementById('add-alarm-btn');
+  const alarmsListEl = document.getElementById('alarms-list');
+  const alarmSound = document.getElementById('alarm-sound');
+  const worldTimezoneSelect = document.getElementById('world-timezone');
+  const worldTimeDisplay = document.getElementById('world-time-display');
+  const toggle12h = document.getElementById('toggle-12-24');
+
+  // Variables for alarms
+  let alarms = [];
+
+  // Load alarms from localStorage if available
+  function loadAlarms() {
+    const saved = localStorage.getItem('alarms');
+    if (saved) {
+      try {
+        alarms = JSON.parse(saved);
+      } catch (e) {
+        alarms = [];
+      }
+    }
+  }
+  // Save alarms to localStorage
+  function saveAlarms() {
+    localStorage.setItem('alarms', JSON.stringify(alarms));
+  }
+
+  // Load 12/24 hour preference from localStorage
+  function loadTimeFormatPref() {
+    const saved = localStorage.getItem('timeFormat12h');
+    return saved === 'true';
+  }
+  function saveTimeFormatPref(value) {
+    localStorage.setItem('timeFormat12h', value.toString());
+  }
+
+  // Render alarms list
+  function renderAlarms() {
+    alarmsListEl.innerHTML = '';
+    alarms.forEach((time, index) => {
+      const li = document.createElement('li');
+      li.textContent = time;
+      const delBtn = document.createElement('button');
+      delBtn.textContent = '×';
+      delBtn.title = "Delete Alarm";
+      delBtn.addEventListener('click', () => {
+        alarms.splice(index, 1);
+        saveAlarms();
+        renderAlarms();
+      });
+      li.appendChild(delBtn);
+      alarmsListEl.appendChild(li);
+    });
+  }
+
+  // Format time for display depending on 12/24h selection
+  function formatTime(date, use12h=false, withSeconds = true) {
+    let options = {
+      hour12: use12h,
+      hour: '2-digit',
+      minute: '2-digit',
+    };
+    if(withSeconds){
+      options.second = '2-digit';
+    }
+    return date.toLocaleTimeString('en-US', options);
+  }
+
+  // Check and trigger alarms if matched
+  function checkAlarms(currentTime) {
+    alarms.forEach((alarmTime, index) => {
+      if (alarmTime === currentTime) {
+        alarmSound.play();
+        alert('Alarm ringing for ' + alarmTime);
+        // Remove alarm after triggering
+        alarms.splice(index, 1);
+        saveAlarms();
+        renderAlarms();
+      }
+    });
+  }
+
+  addAlarmBtn.addEventListener('click', () => {
+    const time = alarmTimeInput.value;
+    if (!time) {
+      alert('Please select a valid time to set alarm.');
+      return;
+    }
+    if (alarms.includes(time)) {
+      alert('Alarm for this time already set.');
+      return;
+    }
+    alarms.push(time);
+    alarms.sort();
+    saveAlarms();
+    renderAlarms();
+    alarmTimeInput.value = '';
+  });
+
+  // Update local clock every second
+  function updateLocalClock() {
+    const now = new Date();
+    // Alarm matching uses 24h format hh:mm
+    const h24 = pad(now.getHours());
+    const m = pad(now.getMinutes());
+    const s = pad(now.getSeconds());
+    const timeStr24 = `${h24}:${m}`;
+    checkAlarms(timeStr24);
+
+    // display user time in selected format
+    const timeStrDisplay = formatTime(now, toggle12h.checked);
+    localClockEl.textContent = timeStrDisplay;
+  }
+
+  // Weather fetching using Open-Meteo (no API key needed)
+  async function fetchWeather(lat, lon) {
+    try {
+      const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true`;
+      const response = await fetch(url);
+      if (!response.ok) throw new Error('Weather API error');
+      const data = await response.json();
+      if (data.current_weather && typeof data.current_weather.temperature === 'number') {
+        localTempEl.textContent = `Temperature: ${data.current_weather.temperature.toFixed(1)} °C`;
+      } else {
+        localTempEl.textContent = 'Temperature: N/A';
+      }
+    } catch (error) {
+      localTempEl.textContent = 'Temperature: Error fetching';
+    }
+  }
+
+  // Get geolocation and update weather and time
+  function loadLocalData() {
+    if (!navigator.geolocation) {
+      statusEl.textContent = 'Geolocation is not supported by your browser.';
+      localTempEl.textContent = '';
+      return;
+    }
+    statusEl.textContent = 'Locating…';
+
+    navigator.geolocation.getCurrentPosition(
+      position => {
+        const lat = position.coords.latitude.toFixed(4);
+        const lon = position.coords.longitude.toFixed(4);
+        statusEl.textContent = `Your Location: ${lat}, ${lon}`;
+        fetchWeather(position.coords.latitude, position.coords.longitude);
+      },
+      error => {
+        statusEl.textContent = 'Unable to retrieve your location.';
+        localTempEl.textContent = '';
+      }
+    );
+  }
+
+
+  // World timezones list simplified from IANA tz database
+  const timezones = [
+    { label: 'UTC', tz: 'Etc/UTC' },
+    { label: 'New York, USA (Eastern)', tz: 'America/New_York' },
+    { label: 'Chicago, USA (Central)', tz: 'America/Chicago' },
+    { label: 'Denver, USA (Mountain)', tz: 'America/Denver' },
+    { label: 'Los Angeles, USA (Pacific)', tz: 'America/Los_Angeles' },
+    { label: 'London, UK', tz: 'Europe/London' },
+    { label: 'Paris, France', tz: 'Europe/Paris' },
+    { label: 'Berlin, Germany', tz: 'Europe/Berlin' },
+    { label: 'Moscow, Russia', tz: 'Europe/Moscow' },
+    { label: 'Dubai, UAE', tz: 'Asia/Dubai' },
+    { label: 'Mumbai, India', tz: 'Asia/Kolkata' },
+    { label: 'Bangkok, Thailand', tz: 'Asia/Bangkok' },
+    { label: 'Beijing, China', tz: 'Asia/Shanghai' },
+    { label: 'Tokyo, Japan', tz: 'Asia/Tokyo' },
+    { label: 'Sydney, Australia', tz: 'Australia/Sydney' },
+    { label: 'Auckland, New Zealand', tz: 'Pacific/Auckland' },
+    { label: 'Honolulu, USA (Hawaii)', tz: 'Pacific/Honolulu' },
+    { label: 'Buenos Aires, Argentina', tz: 'America/Argentina/Buenos_Aires' },
+    { label: 'Sao Paulo, Brazil', tz: 'America/Sao_Paulo' },
+  ];
+
+  // Populate timezone dropdown
+  function populateTimezoneSelect() {
+    timezones.forEach(({ label, tz }) => {
+      const option = document.createElement('option');
+      option.value = tz;
+      option.textContent = label;
+      worldTimezoneSelect.appendChild(option);
+    });
+  }
+
+  // Update world time display respecting 12/24h toggle
+  function updateWorldTime() {
+    const tz = worldTimezoneSelect.value;
+    if (!tz) {
+      worldTimeDisplay.textContent = '--:--:--';
+      return;
+    }
+    try {
+      const now = new Date();
+      const options = {
+        hour12: toggle12h.checked,
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        timeZone: tz,
+      };
+      const timeStr = now.toLocaleTimeString('en-US', options);
+      worldTimeDisplay.textContent = timeStr;
+    } catch (e) {
+      worldTimeDisplay.textContent = 'Invalid Timezone';
+    }
+  }
+
+  // Initialize time format toggle value from localStorage
+  function initToggleFromPref() {
+    const pref = loadTimeFormatPref();
+    toggle12h.checked = pref;
+  }
+
+  // Save toggle preference on change and update clocks immediately
+  toggle12h.addEventListener('change', () => {
+    saveTimeFormatPref(toggle12h.checked);
+    updateLocalClock();
+    updateWorldTime();
+  });
+
+  // Initialization
+  function init() {
+    loadAlarms();
+    renderAlarms();
+    loadLocalData();
+    populateTimezoneSelect();
+    worldTimezoneSelect.value = 'Etc/UTC';
+    initToggleFromPref();
+
+    // Update intervals
+    setInterval(updateLocalClock, 1000);
+    setInterval(updateWorldTime, 1000);
+  }
+
+  init();
+</script>
+</body>
+</html>
+
